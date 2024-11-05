@@ -1,0 +1,258 @@
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+from collections import Counter
+from sklearn.preprocessing import LabelEncoder
+import re
+import string
+import nltk
+from nltk.corpus import stopwords
+from nltk.tokenize import word_tokenize
+from nltk.stem import PorterStemmer
+from wordcloud import WordCloud
+from textblob import TextBlob
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import classification_report, confusion_matrix
+from sklearn.metrics import ConfusionMatrixDisplay, roc_auc_score
+from sklearn.naive_bayes import MultinomialNB
+from sklearn.linear_model import LogisticRegression
+from sklearn.svm import LinearSVC
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.ensemble import RandomForestClassifier
+from xgboost import XGBClassifier
+import warnings
+warnings.filterwarnings("ignore")
+SMS = pd.read_csv("spam.csv", encoding="latin-1")
+SMS.head()
+SMS.isnull().sum()
+SMS.columns
+SMS.info()
+SMS.shape
+SMS.drop(["Unnamed: 2","Unnamed: 3","Unnamed: 4"],axis=1,inplace=True)
+SMS.head()
+SMS = SMS.rename(columns={"v1":"label","v2":"message"})
+SMS.head()
+duplicates = SMS[SMS.duplicated()]
+duplicates
+SMS = SMS.drop_duplicates(keep='first')
+SMS.label
+SMS.agg
+SMS.duplicated().sum()
+X = SMS.iloc[:, :-1].values
+y = SMS.iloc[:, -1].values
+#Length of the message (character count)
+SMS['message_length'] = SMS['message'].apply(len)
+SMS.head()
+SMS['label_length'] = SMS['label'].apply(len)
+SMS.head()
+# Word count in each message
+SMS['word_count'] = SMS['message'].apply(lambda x: len(x.split()))
+SMS.head()
+# Sentence count (using period '.' as separator)
+SMS['sentence_count'] = SMS['message'].apply(lambda x: len(re.split(r'[.!?]+', x)) - 1)
+SMS.head()
+# Count of numbers in the message
+SMS['number_count'] = SMS['message'].apply(lambda x: len(re.findall(r'\d+', x)))
+SMS.head()
+# Count of special characters in the message
+special_chars = string.punctuation
+SMS['special_count'] = SMS['message'].apply(lambda x: sum(1 for char in x if char in special_chars))
+SMS.head()
+# Punctuation count
+SMS['punctuation_count'] = SMS['message'].apply(lambda x: sum(1 for char in x if char in '.!?'))
+SMS.head()
+# Count of capitalized words
+SMS['capitalized_count'] = SMS['message'].apply(lambda x: sum(1 for word in x.split() if word.isupper()))
+SMS.head()
+# Calculate message length statistics for ham and spam
+ham_stats = SMS[SMS['label'] == 'ham']['message_length'].describe()
+spam_stats = SMS[SMS['label'] == 'spam']['message_length'].describe()
+print("Ham Message Length Stats:\n", ham_stats)
+print("\nSpam Message Length Stats:\n", spam_stats)
+# Calculate message word count statistics for ham and spam
+ham_stats = SMS[SMS['label'] == 'ham']['word_count'].describe()
+spam_stats = SMS[SMS['label'] == 'spam']['word_count'].describe()
+print("Ham Message Word Count Stats:\n", ham_stats)
+print("\nSpam Message Word Count Stats:\n", spam_stats)
+plt.figure(figsize=(12, 5))
+plt.subplot(1, 2, 1)
+sns.countplot(y='label', data=SMS, palette='Set2')
+plt.title('Distribution of Ham vs Spam Messages')
+plt.xlabel('Count')
+plt.ylabel('Label')
+ax = plt.gca()
+for p in ax.patches:
+    ax.annotate(f'{int(p.get_width())}', (p.get_width(), p.get_y() + p.get_height() / 2),
+                ha='left', va='center', xytext=(5, 0), textcoords='offset points')
+
+sns.despine(left=True, bottom=True)
+plt.subplot(1, 2, 2)
+SMS['label'].value_counts().plot.pie(
+    autopct='%1.1f%%',
+    colors=sns.color_palette('Set2'),
+    startangle=90,
+    explode=[0.05] * SMS['label'].nunique()
+)
+plt.title('Percentage Distribution of Ham vs Spam Messages')
+plt.ylabel('')
+plt.tight_layout()
+plt.show()
+# Function to perform univariate analysis for numeric columns
+def univariate_analysis(data, column, title):
+    plt.figure(figsize=(10, 6))
+    plt.subplot(1, 2, 1)
+    sns.histplot(data[column], kde=True, bins=30, color='skyblue')
+    plt.title(f'{title} Distribution with KDE')
+    plt.xlabel(title)
+    plt.ylabel('Frequency')
+    plt.subplot(1, 2, 2)
+    sns.boxplot(data[column], color='coral')
+    plt.title(f'{title} Boxplot')
+    plt.xlabel(title)
+    plt.ylabel('Value')
+    plt.tight_layout()
+    plt.show()
+    print(f'\nSummary Statistics for {title}:\n', data[column].describe())
+columns_to_analyze = ['message_length', 'word_count', 'sentence_count', 'number_count', 'special_count', 'punctuation_count', 'capitalized_count']
+for column in columns_to_analyze:
+    univariate_analysis(SMS, column, column.replace('_', ' '))
+SMS['unique_word_count'] = SMS['message'].apply(lambda x: len(set(x.split())))
+SMS['average_word_length'] = SMS['message'].apply(lambda x: sum(len(word) for word in x.split()) / len(x.split()) if len(x.split()) > 0 else 0)
+SMS['average_sentence_length'] = SMS['message'].apply(lambda x: len(x.split()) / (x.count('.') + 1))
+def plot_feature_distribution(data, feature, bins=50):
+    plt.figure(figsize=(10, 6))
+    sns.histplot(data=data, x=feature, hue='label', bins=bins, kde=True, palette='muted')
+    plt.title(f'Distribution of {feature.capitalize()} by Label')
+    plt.xlabel(feature.capitalize().replace('_', ' '))
+    plt.ylabel('Frequency')
+    plt.show()
+plot_feature_distribution(SMS, 'message_length')
+plot_feature_distribution(SMS, 'word_count')
+plot_feature_distribution(SMS, 'sentence_count')
+plot_feature_distribution(SMS, 'number_count')
+plot_feature_distribution(SMS, 'special_count')
+plot_feature_distribution(SMS, 'punctuation_count')
+plot_feature_distribution(SMS, 'capitalized_count')
+plot_feature_distribution(SMS, 'unique_word_count')
+plot_feature_distribution(SMS, 'average_word_length')
+plot_feature_distribution(SMS, 'average_sentence_length')
+# Average Feature Counts: Ham vs Spam Messages
+avg_counts = SMS.groupby('label')[['message_length', 'word_count', 'sentence_count', 'number_count', 'special_count', 'punctuation_count', 'capitalized_count']].mean()
+avg_counts
+# Tokenize and extract the most common words
+def get_top_words(messages, n=20):
+    words = ' '.join(messages).split()
+    return Counter(words).most_common(n)
+ham_words = get_top_words(SMS[SMS['label'] == 'ham']['message'])
+spam_words = get_top_words(SMS[SMS['label'] == 'spam']['message'])
+print("Top 20 Words in Ham Messages:", ham_words)
+print("Top 20 Words in Spam Messages:", spam_words)
+ham_words_df = pd.DataFrame(ham_words, columns=['word', 'count'])
+spam_words_df = pd.DataFrame(spam_words, columns=['word', 'count'])
+def plot_top_words(words_df, title):
+    plt.figure(figsize=(12, 6))
+    sns.barplot(data=words_df, x='count', y='word', palette='muted')
+    plt.title(title, fontsize=20)
+    plt.xlabel('Count', fontsize=14)
+    plt.ylabel('Word', fontsize=14)
+    plt.show()
+plot_top_words(ham_words_df, "Top 20 Words in Ham Messages")
+plot_top_words(spam_words_df, "Top 20 Words in Spam Messages")
+def generate_wordcloud_for_category(data, category, title):
+    category_data = data[data['label'] == category]['message']
+    wordcloud = WordCloud(width=800, height=400, background_color='white').generate(" ".join(category_data))
+    plt.figure(figsize=(10, 6))
+    plt.imshow(wordcloud, interpolation='bilinear')
+    plt.axis('off')
+    plt.title(f"{title}: {category.capitalize()}", fontsize=20)
+    plt.show()
+generate_wordcloud_for_category(SMS, 'ham', "Word Cloud for label category")
+generate_wordcloud_for_category(SMS, 'spam', "Word Cloud for label category")
+encoder = LabelEncoder()
+SMS = SMS.copy()
+SMS['label_encoded'] = encoder.fit_transform(SMS['label'])
+print(SMS[['label', 'label_encoded']].head())
+features_for_pairplot = SMS[['message_length', 'word_count', 'sentence_count', 'label_encoded']]
+sns.pairplot(data=features_for_pairplot, hue='label_encoded', palette='muted', diag_kind='kde')
+plt.suptitle('Pair Plot of Features with Label', y=1.02)
+plt.show()
+features_for_heatmap = SMS[
+    ['message_length', 'word_count', 'sentence_count',
+     'number_count', 'special_count', 'punctuation_count',
+     'capitalized_count', 'label_encoded']
+]
+correlation_matrix = features_for_heatmap.corr()
+correlation_matrix
+plt.figure(figsize=(10, 8))
+sns.heatmap(correlation_matrix, annot=True, cmap='coolwarm', linewidths=0.5, fmt='.2f')
+plt.title('Correlation Heatmap of Features')
+plt.show()
+import pandas as pd
+import nltk
+from nltk.corpus import stopwords
+from nltk.stem import PorterStemmer
+from nltk.tokenize import word_tokenize
+nltk.download('punkt')
+nltk.download('stopwords')
+stop_words = set(stopwords.words('english'))
+stemmer = PorterStemmer()
+def transform_text(text):
+    text = text.lower()
+    tokens = word_tokenize(text)
+    tokens = [word for word in tokens if word.isalnum()]
+    tokens = [word for word in tokens if word not in stop_words and len(word) > 2]
+    transformed_tokens = [stemmer.stem(word) for word in tokens]
+    return " ".join(transformed_tokens)
+if 'message' in SMS.columns:
+    SMS['transformed_text'] = SMS['message'].apply(transform_text)
+else:
+    print("The 'message' column does not exist in the SMS DataFrame.")
+from sklearn.model_selection import train_test_split
+y = SMS['v2']
+X = SMS.drop(columns=['v2'])
+print(f"Shape of X: {X.shape}")
+print(f"Shape of y: {y.shape}")
+if X.shape[0] == y.shape[0]:
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
+    print("Data split successfully.")
+else:
+    print("Mismatch in sample sizes: X has", X.shape[0], "samples, while y has", y.shape[0], "samples.")
+# Split the data into features (X) and target (y)
+X = SMS['v1']
+Y = SMS['v2']  # 0 = ham, 1 = spam
+# Split the data into training and testing sets (70% train, 30% test)
+X_train, X_test, X_train, Y_test = train_test_split(X, y, test_size=0.3, random_state=42)
+tfidf = TfidfVectorizer(max_features=3000)
+X_train_tfidf = tfidf.fit_transform(X_train)
+X_test_tfidf = tfidf.transform(X_test)
+# Initialize the models
+models = {
+    "Naive Bayes": MultinomialNB(),
+    "Logistic Regression": LogisticRegression(max_iter=1000, random_state=42),
+    "SVM": LinearSVC(random_state=42),
+    "Random Forest": RandomForestClassifier(n_estimators=100, random_state=42),
+}
+# Initialize the models
+models = {
+    "Naive Bayes": MultinomialNB(),
+    "Logistic Regression": LogisticRegression(max_iter=1000, random_state=42),
+    "SVM": LinearSVC(random_state=42),
+    "Random Forest": RandomForestClassifier(n_estimators=100, random_state=42)
+}
+# Function to train, predict, and evaluate models
+def evaluate_model(name, model):
+    print(f"\n{name} - Model Evaluation:")
+    model.fit(X_train_tfidf, y_train)
+    y_pred = model.predict(X_test_tfidf)
+    print(classification_report(y_test, y_pred))
+    ConfusionMatrixDisplay.from_predictions(y_test, y_pred, cmap='Purples', values_format='d')
+    plt.title(f'{name} - Confusion Matrix')
+    plt.show()
+    # Train and evaluate all models
+for name, model in models.items():
+    evaluate_model(name, model)
+
+
