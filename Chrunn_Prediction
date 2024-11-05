@@ -1,0 +1,137 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import accuracy_score ,confusion_matrix
+from sklearn.preprocessing import LabelEncoder
+from sklearn.preprocessing import OneHotEncoder
+from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import classification_report
+churnn = pd.read_csv('Churn_Modelling.csv')
+churnn.head()
+churnn.describe()
+churnn.isnull().sum()
+churnn.info()
+churnn.shape
+desc_stats = churnn.describe(include='all')
+print("Descriptive statistics:\n", desc_stats)
+churnn.dtypes
+chuurnn = churnn.select_dtypes(include=['int64', 'float64'])
+churnn.idxmax
+churnn.idxmin
+churnn.items
+col = ['CreditScore', 'Age', 'Tenure', 'Balance', 'NumOfProducts', 'EstimatedSalary']
+colors = ['green', 'blue', 'red', 'purple', 'orange', 'brown', 'pink', 'cyan']
+plt.figure(figsize=(15, 12))
+for i, column in enumerate(col):
+    plt.subplot(3, 2, i + 1)
+    plt.hist(churnn[column], bins=30, color=colors[i % len(colors)], edgecolor='black')
+    plt.title(f'Distribution of {column}', fontsize=14)
+    plt.xlabel(column)
+    plt.ylabel('Frequency')
+plt.tight_layout()
+plt.suptitle("Distribution of Numerical Features", fontsize=16, y=1.02)
+plt.show()
+churnn.duplicated().sum()
+pays_uniques_1 = churnn['Age'].unique()
+print(pays_uniques_1)
+pays_uniques_2 = churnn['Tenure'].unique()
+print(pays_uniques_2)
+pays_uniques_3 = churnn['Exited'].unique()
+print(pays_uniques_3)
+pays_uniques_4 = churnn['HasCrCard'].unique()
+print(pays_uniques_4)
+pays_uniques_5= churnn['IsActiveMember'].unique()
+print(pays_uniques_5)
+plt.figure(figsize=(10,10))
+sns.histplot(data=churnn,x='Age',kde=True)
+plt.xlabel('Age')
+plt.ylabel('Count')
+plt.title('Age Distribution')
+plt.show()
+gender_counts = churnn['Gender'].value_counts()
+sns.barplot(x=gender_counts.index, y=gender_counts.values, palette=['purple', 'yellow'])
+plt.title('Distribution of Male and Female Customers')
+plt.xlabel('Gender')
+plt.ylabel('Count')
+plt.show()
+churnn['Gender'].value_counts()
+churnn['Gender'] = churnn['Gender'].map({'Female': 1, 'Male': 0})
+search_word = 'Hargrave'
+found_columns = []
+for column in churnn.columns:
+    if churnn[column].astype(str).str.contains(search_word, case=False, na=False).any():
+        found_columns.append(column)
+
+print("Columns containing the word '{}':".format(search_word), found_columns)
+search_word = 'France'
+found_columns = []
+for column in churnn.columns:
+    if churnn[column].astype(str).str.contains(search_word, case=False, na=False).any():
+        found_columns.append(column)
+
+print("Columns containing the word '{}':".format(search_word), found_columns)
+le = LabelEncoder()
+churnn['Surname'] = le.fit_transform(churnn['Surname'])
+churnn['Gender'] = le.fit_transform(churnn['Gender'])
+# Replace these columns with integer conversion
+churnn['HasCrCard'] = churnn['HasCrCard'].astype(int)
+churnn['IsActiveMember'] = churnn['IsActiveMember'].astype(int)
+churnn['Exited'] = churnn['Exited'].astype(int)
+numeric_data = churnn.select_dtypes(include='number')
+correlation_matrix = numeric_data.corr()
+plt.figure(figsize=(12, 8))
+sns.heatmap(correlation_matrix, annot=True, cmap='coolwarm', fmt='.2f')
+plt.title('Correlation_Matrix')
+plt.show()
+churnn['Balance_Salary_Ratio'] = churnn['Balance'] / churnn['EstimatedSalary']
+churnn.drop(['Balance', 'EstimatedSalary'], axis=1, inplace=True)
+import pandas as pd
+def preprocess_data(data):
+    # Adding missing columns
+    for col in ['Geography_Germany', 'Geography_Spain', 'Gender_Male']:
+        if col not in churnn.columns:
+            churnn[col] = 0  # Initialize missing columns with 0
+
+    # Rearranging columns to match the model's expected input
+    churnn = churnn[['CreditScore', 'Age', 'Tenure', 'Balance', 'NumOfProducts',
+                                 'HasCrCard', 'IsActiveMember', 'EstimatedSalary',
+                                 'Geography_Germany', 'Geography_Spain', 'Gender_Male']]
+
+    return churnn  # Return the processed DataFrame
+x= churnn.drop('Exited',axis=1)
+y=churnn['Exited']
+x
+X_train,X_test,y_train,y_test=train_test_split(x,y,test_size=0.3,random_state=0)
+#Model Selection and evaluation
+X_train = pd.get_dummies(X_train, drop_first=True)
+X_test = pd.get_dummies(X_test, drop_first=True)
+X_train, X_test = X_train.align(X_test, join='left', axis=1, fill_value=0)
+RFC = RandomForestClassifier(random_state=0)
+RFC.fit(X_train, y_train)
+y_pred1 = RFC.predict(X_test)
+accuracy_score(y_test, y_pred1)
+print(confusion_matrix(y_test,y_pred1))
+print(classification_report(y_test,y_pred1))
+importances = RFC.feature_importances_
+feature_names = X_train.columns
+importance_df = pd.DataFrame({'Feature': feature_names, 'Importance': importances})
+importance_df = importance_df.sort_values(by='Importance', ascending=False)
+plt.figure(figsize=(10, 6))
+plt.barh(importance_df['Feature'], importance_df['Importance'], color=plt.cm.viridis(importance_df['Importance'] / max(importance_df['Importance'])))
+plt.xlabel('Importance')
+plt.ylabel('Characteristics')
+plt.title('Importance of Characteristics')
+plt.show()
+cm = confusion_matrix(y_test, y_pred1)
+plt.figure(figsize=(10, 7))
+sns.heatmap(cm, annot=True, fmt='d', cmap='Purples',
+            xticklabels=['Predicted No', 'Predicted Yes'],
+            yticklabels=['Actual No', 'Actual Yes'])
+plt.title('Confusion Matrix Heatmap', fontsize=16)
+plt.xlabel('Predicted Labels', fontsize=14)
+plt.ylabel('Actual Labels', fontsize=14)
+plt.show()
