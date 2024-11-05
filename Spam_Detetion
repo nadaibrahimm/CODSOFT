@@ -242,7 +242,16 @@ models = {
     "SVM": LinearSVC(random_state=42),
     "Random Forest": RandomForestClassifier(n_estimators=100, random_state=42)
 }
-# Function to train, predict, and evaluate models
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import classification_report, ConfusionMatrixDisplay
+import matplotlib.pyplot as plt
+
+X_train, X_test, y_train, y_test = train_test_split(SMS['message'], SMS['label'], test_size=0.2, random_state=42)
+vectorizer = TfidfVectorizer()
+X_train_tfidf = vectorizer.fit_transform(X_train)
+X_test_tfidf = vectorizer.transform(X_test)
+
 def evaluate_model(name, model):
     print(f"\n{name} - Model Evaluation:")
     model.fit(X_train_tfidf, y_train)
@@ -251,8 +260,12 @@ def evaluate_model(name, model):
     ConfusionMatrixDisplay.from_predictions(y_test, y_pred, cmap='Purples', values_format='d')
     plt.title(f'{name} - Confusion Matrix')
     plt.show()
-    # Train and evaluate all models
+
 for name, model in models.items():
-    evaluate_model(name, model)
+    try:
+        evaluate_model(name, model)
+    except ValueError as e:
+        print(f"Error with model {name}: {e}")
+
 
 
